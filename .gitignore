@@ -1,0 +1,4 @@
+venv/
+tf_model/
+static/js_app
+uploads/

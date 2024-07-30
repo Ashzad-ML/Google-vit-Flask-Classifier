@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Image Classification</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='js_app/style.css') }}">
+</head>
+<body>
+
+  <h1>Ashzad's Classifier Model</h1>
+
+  <div class="container">
+    <input accept="image/*" type="file" id="input_button" />
+    <br>
+    <img id="img1" src="{{ url_for('static', filename='js_app/image.jpg') }}" alt="Upload an image" />
+    <br><br>
+    <button onclick="predict()">Predict</button>
+    <br><br>
+    <p id="result"></p>
+  </div>
+
+  <script>
+    let model;
+    let image = document.getElementById('img1');
+    let input_button = document.getElementById('input_button');
+  
+    async function load_model(){
+      const modelPath = "{{ url_for('static', filename='js_app/model.json') }}";
+      model = await tf.loadGraphModel(modelPath);
+      console.log("Model Loaded Successfully!!")
+    }
+
+    window.onload = load_model;
+
+    input_button.onchange = evt => {
+      const [file] = input_button.files;
+      if (file) {
+        image.src = URL.createObjectURL(file);
+        document.getElementById("result").innerHTML = "";
+      }
+    };
+
+    async function predict() {
+      const imgElement = document.getElementById("img1");
+      let tensor = tf.browser.fromPixels(imgElement)
+        .resizeNearestNeighbor([224, 224])  
+        .toFloat()
+        .div(tf.scalar(255.0)) 
+        .expandDims();  
+
+      tensor = tensor.transpose([0, 3, 1, 2]);
+
+      const prediction = await model.predict(tensor);
+      const class_scores = await prediction.data();
+
+      const softmax = (scores) => {
+        const maxScore = Math.max(...scores);
+        const expScores = scores.map(score => Math.exp(score - maxScore));
+        const sumExpScores = expScores.reduce((a, b) => a + b, 0);
+        return expScores.map(score => score / sumExpScores);
+      };
+
+      const class_probabilities = softmax(class_scores);
+      // const class_percentages = class_probabilities.map(prob => (prob * 100).toFixed(2));
+
+      const max_score_id = class_probabilities.indexOf(Math.max(...class_probabilities));
+      const classes = ["Pattern", "Solid"];
+      
+      // console.log("Class Probabilities:", class_probabilities);
+      // console.log("Class Percentages:", class_percentages);
+
+      let resultText = `Prediction: ${classes[max_score_id]}<br>`;
+      for (let i = 0; i < classes.length; i++) {
+        // resultText += `${classes[i]}: ${class_percentages[i]}%<br>`;
+        const percentage = (class_probabilities[i] * 100).toFixed(2);
+        resultText += `${classes[i]}: ${percentage}%<br>`;
+      }
+
+      document.getElementById("result").innerHTML = resultText;
+    }
+  </script>
+</body>
+</html>
